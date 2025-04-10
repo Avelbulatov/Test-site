@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Генератор L-систем с цветами</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { touch-action: none; }
+        #settings {
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: rgba(200,200,200,0.9);
+            padding: 10px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .rule-row { margin: 5px 0; }
+        .rule-row input { width: 200px; }
+        button { margin: 5px; }
+        .mode-btn { width: 120px; }
+        .active { background: #4CAF50; color: white; }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="settings">
+        <button onclick="toggleSettings()">Toggle Settings</button>
+        <div id="controls" style="display: block;">
+            <div class="rule-row">
+                <label>Axiom: <input id="axiom" value="F"></label>
+            </div>
+            
+            <div id="rules-container"></div>
+            
+            <div class="rule-row">
+                <label>Iterations: 
+                    <input id="iterations" type="number" value="4" min="1" max="10">
+                    <input type="range" id="iterationsRange" min="1" max="10" value="4" style="width: 200px;">
+                </label>
+            </div>
+            
+            <div class="rule-row">
+                <label>Angle X: <input id="angleX" type="number" value="25"></label>
+                <input type="range" id="angleXRange" min="0" max="180" value="25" style="width: 200px;">
+            </div>
+            
+            <div class="rule-row">
+                <label>Angle Y: <input id="angleY" type="number" value="25"></label>
+                <input type="range" id="angleYRange" min="0" max="180" value="25" style="width: 200px;">
+            </div>
+            
+            <div class="rule-row">
+                <button class="mode-btn" id="colorModeBtn" onclick="toggleColorMode()">Color Mode: OFF</button>
+                <button class="mode-btn" id="thicknessModeBtn" onclick="toggleThicknessMode()">Thickness Mode: OFF</button>
+            </div>
+            
+            <button onclick="redraw()">Redraw</button>
+        </div>
+    </div>
+
+    <script>
+        let colorMode = false;
+        let thicknessMode = false;
+        const symbols = ['+', '-', '>', '<', '[', ']', 'F', 'G', 'N', 'A', 'B', 'C'];
+        const symbolss = ['+ (angle x)', '- (angle x)', '> (angle y)', '< (angle y)', '[ (save position)', '] (back to position)', 'F (line segment)', 'G (line segment)', 'N (just move)', 'A', 'B', 'C'];
+        let segments = [];
+        let globalRotX = 0;
+        let globalRotY = 0;
+        let isDragging = false;
+        let lastX, lastY;
+        let isTouching = false;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let currentSystem = "";
+
+        function initRules() {
+            const container = document.getElementById('rules-container');
+            symbolss.forEach(symbbol => {
+                const div = document.createElement('div');
+                div.className = 'rule-row';
+                div.innerHTML = `
+                    <label>${symbbol}: <input id="rule-${symbbol[0]}" placeholder="Rule"></label>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function generateLSystem(axiom, rules, iterations) {
+            let current = axiom;
+            for (let i = 0; i < iterations; i++) {
+                let next = '';
+                for (let c of current) {
+                    const rule = rules[c] || c;
+                    const alternatives = rule.split('|');
+                    next += alternatives[Math.floor(Math.random() * alternatives.length)];
+                }
+                current = next;
+            }
+            currentSystem = current;
+            return current;
+        }
+
+        function countConsecutiveFG(system, index) {
+            if (index < 0 || index >= system.length) return 0;
+            if (!['F','G'].includes(system[index])) return 0;
+            
+            let left = index;
+            while (left >= 0 && ['F','G'].includes(system[left])) left--;
+            left++;
+            
+            let right = index;
+            while (right < system.length && ['F','G'].includes(system[right])) right++;
+            right--;
+            
+            return right - left + 1;
+        }
+
+        function interpretLSystem(system, angleX, angleY) {
+            const segs = [];
+            const segmentLength = 4;
+            
+            class TurtleState {
+                constructor(pos, forward, up, right) {
+                    this.pos = pos;
+                    this.forward = forward;
+                    this.up = up;
+                    this.right = right;
+                }
+                
+                clone() {
+                    return new TurtleState(
+                        this.pos.clone(),
+                        this.forward.clone(),
+                        this.up.clone(),
+                        this.right.clone()
+                    );
+                }
+            }
+
+            class Vector3 {
+                constructor(x, y, z) {
+                    this.x = x;
+                    this.y = y;
+                    this.z = z;
+                }
+                
+                clone() { return new Vector3(this.x, this.y, this.z); }
+                add(v) { return new Vector3(this.x+v.x, this.y+v.y, this.z+v.z); }
+                multiply(s) { return new Vector3(this.x*s, this.y*s, this.z*s); }
+                dot(v) { return this.x*v.x + this.y*v.y + this.z*v.z; }
+                cross(v) {
+                    return new Vector3(
+                        this.y*v.z - this.z*v.y,
+                        this.z*v.x - this.x*v.z,
+                        this.x*v.y - this.y*v.x
+                    );
+                }
+                normalize() {
+                    const mag = Math.sqrt(this.x**2 + this.y**2 + this.z**2);
+                    return mag === 0 ? this : new Vector3(this.x/mag, this.y/mag, this.z/mag);
+                }
+            }
+
+            let state = new TurtleState(
+                new Vector3(0, 0, 0),
+                new Vector3(0, -1, 0),
+                new Vector3(0, 0, 1),
+                new Vector3(0, -1, 0).cross(new Vector3(0, 0, 1)).normalize()
+            );
+            
+            const stack = [];
+
+            for (let i = 0; i < system.length; i++) {
+                const c = system[i];
+                switch(c) {
+                    case 'F':
+                    case 'G':
+                        const end = state.pos.add(state.forward.multiply(segmentLength));
+                        const length = countConsecutiveFG(system, i);
+                        segs.push({
+                            start: state.pos, 
+                            end,
+                            length,
+                            index: i
+                        });
+                        state.pos = end;
+                        break;
+                        
+                    case 'N':
+                        state.pos = state.pos.add(state.forward.multiply(segmentLength));
+                        break;
+                        
+                    case '+':
+                        state.forward = rotateAroundAxis(state.forward, state.up, angleX);
+                        state.right = rotateAroundAxis(state.right, state.up, angleX);
+                        break;
+                        
+                    case '-':
+                        state.forward = rotateAroundAxis(state.forward, state.up, -angleX);
+                        state.right = rotateAroundAxis(state.right, state.up, -angleX);
+                        break;
+                        
+                    case '>':
+                        state.forward = rotateAroundAxis(state.forward, state.right, angleY);
+                        state.up = rotateAroundAxis(state.up, state.right, angleY);
+                        break;
+                        
+                    case '<':
+                        state.forward = rotateAroundAxis(state.forward, state.right, -angleY);
+                        state.up = rotateAroundAxis(state.up, state.right, -angleY);
+                        break;
+                        
+                    case '[':
+                        stack.push(state.clone());
+                        break;
+                        
+                    case ']':
+                        if (stack.length > 0) state = stack.pop();
+                        break;
+                }
+            }
+            return segs;
+        }
+
+        function rotateAroundAxis(v, axis, theta) {
+            const a = axis.normalize();
+            const cos = Math.cos(theta);
+            const sin = Math.sin(theta);
+            
+            return v.multiply(cos)
+                .add(a.cross(v).multiply(sin))
+                .add(a.multiply(a.dot(v) * (1 - cos)));
+        }
+
+        function toggleColorMode() {
+            colorMode = !colorMode;
+            const btn = document.getElementById('colorModeBtn');
+            btn.textContent = `Color Mode: ${colorMode ? 'ON' : 'OFF'}`;
+            btn.classList.toggle('active', colorMode);
+            draw();
+        }
+
+        function toggleThicknessMode() {
+            thicknessMode = !thicknessMode;
+            const btn = document.getElementById('thicknessModeBtn');
+            btn.textContent = `Thickness Mode: ${thicknessMode ? 'ON' : 'OFF'}`;
+            btn.classList.toggle('active', thicknessMode);
+            draw();
+        }
+
+        function redraw() {
+            const rules = {};
+            symbols.forEach(symbol => {
+                rules[symbol] = document.getElementById(`rule-${symbol}`).value || symbol;
+            });
+            
+            const system = generateLSystem(
+                document.getElementById('axiom').value,
+                rules,
+                parseInt(document.getElementById('iterations').value)
+            );
+            
+            segments = interpretLSystem(
+                system,
+                parseFloat(document.getElementById('angleX').value) * Math.PI / 180,
+                parseFloat(document.getElementById('angleY').value) * Math.PI / 180
+            );
+            
+            draw();
+        }
+
+        function draw() {
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const d = 1000;
+            
+            segments.forEach(seg => {
+                const p1 = applyRotation(seg.start);
+                const p2 = applyRotation(seg.end);
+                
+                const pp1 = project(p1, centerX, centerY, d);
+                const pp2 = project(p2, centerX, centerY, d);
+                
+                // Инвертированная цветовая схема
+                if (colorMode) {
+                    const hue = 120 - (seg.length * 8); // Зеленый для тонких веток
+                    ctx.strokeStyle = `hsl(${Math.max(30, hue)}, 70%, 40%)`;
+                } else {
+                    ctx.strokeStyle = 'blue';
+                }
+                
+                if (thicknessMode) {
+                    ctx.lineWidth = Math.max(1, (seg.length * 0.5));
+                } else {
+                    ctx.lineWidth = 2;
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(pp1.x, pp1.y);
+                ctx.lineTo(pp2.x, pp2.y);
+                ctx.stroke();
+            });
+        }
+
+        function applyRotation(p) {
+            let x = p.x * Math.cos(globalRotY) + p.z * Math.sin(globalRotY);
+            let z = -p.x * Math.sin(globalRotY) + p.z * Math.cos(globalRotY);
+            let y = p.y;
+            
+            y = y * Math.cos(globalRotX) - z * Math.sin(globalRotX);
+            z = p.y * Math.sin(globalRotX) + z * Math.cos(globalRotX);
+            
+            return {x, y, z};
+        }
+
+        function project(p, cx, cy, d) {
+            const factor = d / (p.z + d);
+            return {
+                x: p.x * factor + cx,
+                y: p.y * factor + cy
+            };
+        }
+
+        function toggleSettings() {
+            const controls = document.getElementById('controls');
+            controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // Инициализация
+        initRules();
+        redraw();
+
+        // Обработчики событий
+        canvas.addEventListener('mousedown', e => {
+            isDragging = true;
+            lastX = e.clientX;
+            lastY = e.clientY;
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            
+            const dx = e.clientX - lastX;
+            const dy = e.clientY - lastY;
+            
+            globalRotY += dx * 0.005;
+            globalRotX += dy * 0.005;
+            
+            lastX = e.clientX;
+            lastY = e.clientY;
+            
+            draw();
+        });
+
+        canvas.addEventListener('mouseup', () => isDragging = false);
+        canvas.addEventListener('mouseleave', () => isDragging = false);
+
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            isTouching = true;
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        canvas.addEventListener('touchmove', e => {
+            if (!isTouching) return;
+            e.preventDefault();
+            
+            const touch = e.touches[0];
+            const dx = touch.clientX - touchStartX;
+            const dy = touch.clientY - touchStartY;
+            
+            globalRotY += dx * 0.005;
+            globalRotX += dy * 0.005;
+            
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            
+            draw();
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isTouching = false;
+        });
+
+        // Привязка слайдеров
+        document.getElementById('angleXRange').addEventListener('input', e => {
+            document.getElementById('angleX').value = e.target.value;
+            redraw();
+        });
+        
+        document.getElementById('angleYRange').addEventListener('input', e => {
+            document.getElementById('angleY').value = e.target.value;
+            redraw();
+        });
+        
+        document.getElementById('iterationsRange').addEventListener('input', e => {
+            document.getElementById('iterations').value = e.target.value;
+            redraw();
+        });
+        
+        document.getElementById('iterations').addEventListener('input', e => {
+            document.getElementById('iterationsRange').value = e.target.value;
+            redraw();
+        });
+    </script>
+</body>
+  </html>
