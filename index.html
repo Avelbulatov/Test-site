@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Единство. Доблесть. Технологии. Татарстан</title>
-    <!-- Favicon: флаг Татарстана (зелёно-бело-красный) в формате SVG -->
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 6'%3E%3Crect width='9' height='2' fill='%23009657'/%3E%3Crect y='2' width='9' height='2' fill='%23FFFFFF'/%3E%3Crect y='4' width='9' height='2' fill='%23D52B1E'/%3E%3C/svg%3E">
+    <!-- Флаг Татарстана в иконке сайта (favicon) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='33.3' fill='%23007A3D'/%3E%3Crect y='33.3' width='100' height='33.3' fill='%23FFFFFF'/%3E%3Crect y='66.6' width='100' height='33.4' fill='%23D52B1E'/%3E%3C/svg%3E">
     <style>
-        /* Базовые стили (без изменений, кроме небольших дополнений) */
+        /* Базовые стили */
         * {
             box-sizing: border-box;
             font-family: Arial, sans-serif;
@@ -136,33 +136,29 @@
         .main-menu-button:hover {
             background-color: #da190b;
         }
-        /* Кнопка озвучивания страницы */
-        #speakPageBtn {
-            background-color: #9b59b6;
+        .voice-active {
+            background-color: #ffaa00;
+            color: black;
+            animation: pulse 1s infinite;
         }
-        #speakPageBtn:hover {
-            background-color: #8e44ad;
-        }
-        /* Индикатор поддержки речи */
-        .speech-support {
-            font-size: 0.8em;
-            color: #666;
-            text-align: center;
-            margin-top: 5px;
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
         }
     </style>
 </head>
 <body>
     <div class="header">Подвиги и достижения народов Татарстана</div>
 
-    <!-- Панель доступности -->
+    <!-- Панель доступности (все кнопки добавлены) -->
     <div class="accessibility-panel">
         <button id="contrastBtn">Контрастный режим</button>
         <button id="largeFontBtn">Крупный текст</button>
         <button id="screenReaderBtn">Экранный диктор (вкл)</button>
         <button id="subtitlesBtn">Субтитры</button>
         <button id="signBtn">Сурдоперевод</button>
-        <button id="speakPageBtn">🔊 Озвучить страницу</button>
+        <button id="voiceControlBtn">Голосовое управление</button>
     </div>
 
     <!-- Контейнер страниц (стек) -->
@@ -223,6 +219,7 @@
                 • Субтитры
                 • Контрастный режим
                 • Крупный текст
+                • Голосовое управление
             </div>
             <button class="nav-button main-menu-button" data-page="main">На главную</button>
         </div>
@@ -230,8 +227,6 @@
 
     <!-- Субтитры -->
     <div class="subtitle" id="subtitleDisplay">Субтитры: Добро пожаловать</div>
-    <!-- Информация о поддержке речи (для отладки) -->
-    <div class="speech-support" id="speechSupportInfo"></div>
 
     <script>
         (function() {
@@ -255,52 +250,31 @@
             const largeFontBtn = document.getElementById('largeFontBtn');
             const subtitlesBtn = document.getElementById('subtitlesBtn');
             const signBtn = document.getElementById('signBtn');
-            const speakPageBtn = document.getElementById('speakPageBtn');
-            const speechSupportInfo = document.getElementById('speechSupportInfo');
+            const voiceControlBtn = document.getElementById('voiceControlBtn');
 
-            // Проверка поддержки Web Speech API
-            const speechSupported = 'speechSynthesis' in window;
-            speechSupportInfo.textContent = speechSupported 
-                ? '🔊 Речь поддерживается' 
-                : '⚠️ Речь не поддерживается вашим браузером. Используйте субтитры.';
+            // Все кнопки на странице (для фокуса)
+            let allButtons = [];
 
-            // Функция озвучивания с проверкой и безопасностью
+            // Обновление списка кнопок (вызывается при загрузке и после изменений)
+            function refreshButtonsList() {
+                allButtons = Array.from(document.querySelectorAll('button'));
+            }
+
+            // --- Синтез речи (озвучивание) ---
             function speakText(text) {
                 console.log('Озвучивание:', text);
-                // Всегда обновляем субтитры
-                updateSubtitles('Озвучивание: ' + text.substring(0, 100) + (text.length > 100 ? '…' : ''));
-                
-                if (!screenReaderEnabled) {
-                    console.log('Экранный диктор выключен');
-                    return;
-                }
-                if (!speechSupported) {
+                if (!screenReaderEnabled) return;
+                if (!window.speechSynthesis) {
                     console.warn('Речь не поддерживается');
                     return;
                 }
-                // Отмена предыдущей речи, чтобы не накладывалось
+                // Отмена предыдущей речи, чтобы не накладывалась
                 window.speechSynthesis.cancel();
-                
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'ru-RU';
                 utterance.rate = 1.0;
                 utterance.pitch = 1.0;
-                utterance.volume = 1.0;
-                
-                // Обработка ошибок
-                utterance.onerror = (event) => {
-                    console.error('Ошибка синтеза речи:', event.error);
-                    updateSubtitles('Ошибка воспроизведения речи. Проверьте настройки браузера.');
-                };
-                
-                // В некоторых браузерах требуется пользовательский жест для первого запуска.
-                // Мы уже находимся в обработчике клика, поэтому проблем быть не должно.
-                try {
-                    window.speechSynthesis.speak(utterance);
-                } catch (e) {
-                    console.error('Исключение при speak():', e);
-                    updateSubtitles('Не удалось запустить речь.');
-                }
+                window.speechSynthesis.speak(utterance);
             }
 
             // Обновление субтитров
@@ -315,26 +289,17 @@
                 // Показываем нужную
                 if (pages[pageId]) {
                     pages[pageId].classList.add('active');
-                    
-                    // Получаем текст страницы для озвучивания и субтитров
-                    let pageText = '';
-                    const textElement = pages[pageId].querySelector('.page-text');
-                    if (textElement) {
-                        pageText = textElement.innerText;
-                    }
-                    
-                    if (pageId === 'main') {
-                        updateSubtitles('Главное меню');
-                        // Не озвучиваем текст главной страницы автоматически (только кнопки)
-                    } else {
-                        // Озвучиваем текст страницы, если диктор включён
-                        if (screenReaderEnabled) {
+                    // Если это не главная страница - озвучиваем текст страницы
+                    if (pageId !== 'main') {
+                        const textElement = pages[pageId].querySelector('.page-text');
+                        if (textElement) {
+                            const pageText = textElement.innerText;
                             speakText(pageText);
-                        } else {
                             updateSubtitles('Страница: ' + pageId + '. ' + pageText.substring(0, 100) + '...');
                         }
+                    } else {
+                        updateSubtitles('Главное меню');
                     }
-                    
                     // Устанавливаем фокус на первую кнопку в странице
                     const firstButton = pages[pageId].querySelector('button');
                     if (firstButton) {
@@ -343,11 +308,106 @@
                 }
             }
 
-            // Обработчик фокуса на кнопках
+            // --- Обработчик фокуса для озвучивания кнопок (Tab) ---
             function handleFocus(event) {
                 const target = event.target;
                 if (target.tagName === 'BUTTON' && screenReaderEnabled) {
                     speakText(target.textContent);
+                    updateSubtitles('Фокус: ' + target.textContent);
+                }
+            }
+
+            // --- Голосовое управление (SpeechRecognition) ---
+            let recognition = null;
+            let isListening = false;
+
+            function initSpeechRecognition() {
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    alert('Голосовое управление не поддерживается вашим браузером.');
+                    return null;
+                }
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                const recog = new SpeechRecognition();
+                recog.lang = 'ru-RU';
+                recog.interimResults = false;
+                recog.maxAlternatives = 1;
+                return recog;
+            }
+
+            function startVoiceControl() {
+                if (!recognition) {
+                    recognition = initSpeechRecognition();
+                    if (!recognition) return;
+                }
+
+                if (isListening) {
+                    // Если уже слушаем, останавливаем
+                    recognition.stop();
+                    return;
+                }
+
+                // Настраиваем обработчики
+                recognition.onstart = function() {
+                    isListening = true;
+                    voiceControlBtn.classList.add('voice-active');
+                    updateSubtitles('Голосовое управление активно. Говорите команду...');
+                    speakText('Слушаю команду');
+                };
+
+                recognition.onerror = function(event) {
+                    console.warn('Ошибка распознавания:', event.error);
+                    isListening = false;
+                    voiceControlBtn.classList.remove('voice-active');
+                    updateSubtitles('Ошибка голосового управления: ' + event.error);
+                };
+
+                recognition.onend = function() {
+                    isListening = false;
+                    voiceControlBtn.classList.remove('voice-active');
+                    updateSubtitles('Голосовое управление завершено');
+                };
+
+                recognition.onresult = function(event) {
+                    const last = event.results.length - 1;
+                    const command = event.results[last][0].transcript.trim().toLowerCase();
+                    updateSubtitles('Распознано: ' + command);
+                    speakText('Команда: ' + command);
+                    executeVoiceCommand(command);
+                };
+
+                // Запускаем
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error('Не удалось запустить распознавание:', e);
+                }
+            }
+
+            function executeVoiceCommand(command) {
+                // Сопоставляем ключевые слова с действиями
+                if (command.includes('главная') || command.includes('меню')) {
+                    showPage('main');
+                } else if (command.includes('подвиг') || command.includes('прошл')) {
+                    showPage('past');
+                } else if (command.includes('современ') || command.includes('сегодня')) {
+                    showPage('present');
+                } else if (command.includes('связь') || command.includes('поколен')) {
+                    showPage('connection');
+                } else if (command.includes('проект') || command.includes('о проекте')) {
+                    showPage('about');
+                } else if (command.includes('контраст')) {
+                    contrastBtn.click();
+                } else if (command.includes('крупн') || command.includes('шрифт')) {
+                    largeFontBtn.click();
+                } else if (command.includes('диктор') || command.includes('экранный')) {
+                    screenReaderBtn.click();
+                } else if (command.includes('субтитры')) {
+                    subtitlesBtn.click();
+                } else if (command.includes('сурдо') || command.includes('перевод')) {
+                    signBtn.click();
+                } else {
+                    speakText('Команда не распознана');
+                    updateSubtitles('Команда не распознана: ' + command);
                 }
             }
 
@@ -408,23 +468,11 @@
                 updateSubtitles(msg);
             });
 
-            // Кнопка "Озвучить текущую страницу"
-            speakPageBtn.addEventListener('click', () => {
-                // Находим активную страницу
-                const activePage = document.querySelector('.page.active');
-                if (activePage) {
-                    const textElement = activePage.querySelector('.page-text');
-                    if (textElement) {
-                        speakText(textElement.innerText);
-                    } else {
-                        // Если нет текста (главная), озвучиваем название и кнопки?
-                        const title = activePage.querySelector('.page-title');
-                        if (title) {
-                            speakText(title.innerText + '. Главное меню.');
-                        }
-                    }
-                }
-            });
+            // Голосовое управление
+            voiceControlBtn.addEventListener('click', startVoiceControl);
+
+            // Обновить список кнопок при загрузке
+            refreshButtonsList();
 
             // Ставим фокус на первую кнопку главного меню после загрузки
             window.addEventListener('load', () => {
@@ -432,19 +480,20 @@
                 if (firstMainBtn) {
                     firstMainBtn.focus();
                 }
+                // Показываем главную страницу
                 showPage('main');
-                
-                // Дополнительно: проверяем, не блокирует ли браузер автоматическую речь.
-                // Если speechSynthesis.speak не сработает без жеста, пользователь всегда может нажать кнопку "Озвучить страницу".
-                if (speechSupported) {
-                    // Небольшой тест: если голоса ещё не загружены, они подгрузятся.
-                    if (window.speechSynthesis.getVoices().length === 0) {
-                        window.speechSynthesis.addEventListener('voiceschanged', () => {
-                            console.log('Голоса загружены');
-                        });
+                // Инициализируем синтез речи первым взаимодействием (чтобы избежать блокировки)
+                document.body.addEventListener('click', function initSpeech() {
+                    if (window.speechSynthesis) {
+                        // Пустой utterance для разблокировки в некоторых браузерах
+                        const utterance = new SpeechSynthesisUtterature('');
+                        window.speechSynthesis.speak(utterance);
                     }
-                }
+                    document.body.removeEventListener('click', initSpeech);
+                }, { once: true });
             });
+
+            // Дополнительно: при переходе на страницу с помощью кнопки "На главную" фокус уже устанавливается в showPage.
         })();
     </script>
 </body>
