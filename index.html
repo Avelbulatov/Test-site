@@ -1,420 +1,381 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Генератор L-систем с цветами</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Единство. Доблесть. Технологии. Татарстан</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { touch-action: none; }
-        #settings {
-            position: fixed;
-            top: 0;
-            left: 0;
-            background: rgba(200,200,200,0.9);
-            padding: 10px;
-            max-height: 90vh;
-            overflow-y: auto;
+        /* Базовые стили */
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
         }
-        .rule-row { margin: 5px 0; }
-        .rule-row input { width: 200px; }
-        button { margin: 5px; }
-        .mode-btn { width: 120px; }
-        .active { background: #4CAF50; color: white; }
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+            transition: background-color 0.3s, color 0.3s;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        /* Контрастный режим */
+        body.contrast {
+            background-color: black;
+            color: yellow;
+        }
+        body.contrast button {
+            background-color: yellow;
+            color: black;
+            border: 2px solid white;
+        }
+        body.contrast .subtitle {
+            background-color: black;
+            color: yellow;
+            border-color: yellow;
+        }
+        /* Крупный текст */
+        body.large-text {
+            font-size: 1.5em;
+        }
+        body.large-text button {
+            font-size: 1.2em;
+            padding: 15px 20px;
+        }
+        .header {
+            text-align: center;
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+        .accessibility-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            min-width: 150px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:focus-visible {
+            outline: 3px solid #ff8c00;
+            outline-offset: 2px;
+        }
+        .page {
+            display: none;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        body.contrast .page {
+            background: black;
+            border: 2px solid yellow;
+        }
+        .page.active {
+            display: block;
+        }
+        .page-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .page-text {
+            font-size: 1.2em;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            white-space: pre-line;
+        }
+        .nav-button {
+            display: block;
+            width: 100%;
+            max-width: 300px;
+            margin: 10px auto;
+            background-color: #008CBA;
+        }
+        .nav-button:hover {
+            background-color: #007bb5;
+        }
+        .subtitle {
+            padding: 15px;
+            background-color: #eee;
+            border: 2px solid #aaa;
+            border-radius: 10px;
+            font-size: 1.2em;
+            text-align: left;
+            margin-top: 20px;
+            min-height: 70px;
+        }
+        .footer {
+            margin-top: auto;
+        }
+        .main-menu-button {
+            background-color: #f44336;
+        }
+        .main-menu-button:hover {
+            background-color: #da190b;
+        }
     </style>
 </head>
-
 <body>
-    <canvas id="canvas"></canvas>
-    <div id="settings">
-        <button onclick="toggleSettings()">Toggle Settings</button>
-        <div id="controls" style="display: block;">
-            <div class="rule-row">
-                <label>Axiom: <input id="axiom" value="F"></label>
+    <div class="header">Подвиги и достижения народов Татарстана</div>
+
+    <!-- Панель доступности -->
+    <div class="accessibility-panel">
+        <button id="contrastBtn">Контрастный режим</button>
+        <button id="largeFontBtn">Крупный текст</button>
+        <button id="screenReaderBtn">Экранный диктор (вкл)</button>
+        <button id="subtitlesBtn">Субтитры</button>
+        <button id="signBtn">Сурдоперевод</button>
+    </div>
+
+    <!-- Контейнер страниц (стек) -->
+    <div id="pageStack">
+        <!-- Главная страница -->
+        <div id="mainPage" class="page active">
+            <div class="page-title">Главное меню</div>
+            <button class="nav-button" data-page="past">Подвиги прошлого</button>
+            <button class="nav-button" data-page="present">Современность</button>
+            <button class="nav-button" data-page="connection">Связь поколений</button>
+            <button class="nav-button" data-page="about">О проекте</button>
+        </div>
+
+        <!-- Страница "Подвиги прошлого" -->
+        <div id="pastPage" class="page">
+            <div class="page-title">Подвиги прошлого</div>
+            <div class="page-text">
+                В годы Великой Отечественной войны труженики Татарстана отправляли на фронт технику,
+                продовольствие и тёплые вещи. Казанский авиационный завод выпускал самолёты Пе-2,
+                Ту-2. Рабочие дни длились по 12-14 часов. Многие уходили добровольцами на фронт
+                и совершали героические подвиги. Единство народов республики помогло выстоять.
             </div>
-            
-            <div id="rules-container"></div>
-            
-            <div class="rule-row">
-                <label>Iterations: 
-                    <input id="iterations" type="number" value="4" min="1" max="10">
-                    <input type="range" id="iterationsRange" min="1" max="10" value="4" style="width: 200px;">
-                </label>
+            <button class="nav-button main-menu-button" data-page="main">На главную</button>
+        </div>
+
+        <!-- Страница "Современность" -->
+        <div id="presentPage" class="page">
+            <div class="page-title">Современные достижения</div>
+            <div class="page-text">
+                Сегодня Татарстан — один из лидеров инноваций в России. КАМАЗ, «Алабуга»,
+                IT-парк, новые технологии в нефтехимии. Молодые специалисты продолжают традиции
+                трудовой доблести. Республика славится межнациональным миром и согласием.
             </div>
-            
-            <div class="rule-row">
-                <label>Angle X: <input id="angleX" type="number" value="25"></label>
-                <input type="range" id="angleXRange" min="0" max="180" value="25" style="width: 200px;">
+            <button class="nav-button main-menu-button" data-page="main">На главную</button>
+        </div>
+
+        <!-- Страница "Связь поколений" -->
+        <div id="connectionPage" class="page">
+            <div class="page-title">Связь поколений</div>
+            <div class="page-text">
+                Дух единства и доблести, рождённый в суровые годы, живёт и сегодня.
+                Ветераны передают опыт молодёжи, создаются поисковые отряды,
+                сохраняется память о героях. Трудовые династии работают на заводах,
+                молодые инженеры разрабатывают новые технологии, опираясь на наследие предков.
             </div>
-            
-            <div class="rule-row">
-                <label>Angle Y: <input id="angleY" type="number" value="25"></label>
-                <input type="range" id="angleYRange" min="0" max="180" value="25" style="width: 200px;">
+            <button class="nav-button main-menu-button" data-page="main">На главную</button>
+        </div>
+
+        <!-- Страница "О проекте" -->
+        <div id="aboutPage" class="page">
+            <div class="page-title">О проекте</div>
+            <div class="page-text">
+                Проект «Единство. Доблесть. Технологии. Доступно каждому» создан, чтобы рассказать
+                о подвигах и достижениях народов Татарстана.
+
+                Функции доступности:
+                • Экранный диктор (озвучивание кнопок при Tab, чтение текста страниц)
+                • Субтитры
+                • Контрастный режим
+                • Крупный текст
             </div>
-            
-            <div class="rule-row">
-                <button class="mode-btn" id="colorModeBtn" onclick="toggleColorMode()">Color Mode: OFF</button>
-                <button class="mode-btn" id="thicknessModeBtn" onclick="toggleThicknessMode()">Thickness Mode: OFF</button>
-            </div>
-            
-            <button onclick="redraw()">Redraw</button>
+            <button class="nav-button main-menu-button" data-page="main">На главную</button>
         </div>
     </div>
 
+    <!-- Субтитры -->
+    <div class="subtitle" id="subtitleDisplay">Субтитры: Добро пожаловать</div>
+
     <script>
-        let colorMode = false;
-        let thicknessMode = false;
-        const symbols = ['+', '-', '>', '<', '[', ']', 'F', 'G', 'N', 'A', 'B', 'C'];
-        const symbolss = ['+ (angle x)', '- (angle x)', '> (angle y)', '< (angle y)', '[ (save position)', '] (back to position)', 'F (line segment)', 'G (line segment)', 'N (just move)', 'A', 'B', 'C'];
-        let segments = [];
-        let globalRotX = 0;
-        let globalRotY = 0;
-        let isDragging = false;
-        let lastX, lastY;
-        let isTouching = false;
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let currentSystem = "";
+        (function() {
+            // Состояния
+            let screenReaderEnabled = true;
+            let contrastMode = false;
+            let largeTextMode = false;
 
-        function initRules() {
-            const container = document.getElementById('rules-container');
-            symbolss.forEach(symbbol => {
-                const div = document.createElement('div');
-                div.className = 'rule-row';
-                div.innerHTML = `
-                    <label>${symbbol}: <input id="rule-${symbbol[0]}" placeholder="Rule"></label>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        function generateLSystem(axiom, rules, iterations) {
-            let current = axiom;
-            for (let i = 0; i < iterations; i++) {
-                let next = '';
-                for (let c of current) {
-                    const rule = rules[c] || c;
-                    const alternatives = rule.split('|');
-                    next += alternatives[Math.floor(Math.random() * alternatives.length)];
-                }
-                current = next;
-            }
-            currentSystem = current;
-            return current;
-        }
-
-        function countConsecutiveFG(system, index) {
-            if (index < 0 || index >= system.length) return 0;
-            if (!['F','G'].includes(system[index])) return 0;
-            
-            let left = index;
-            while (left >= 0 && ['F','G'].includes(system[left])) left--;
-            left++;
-            
-            let right = index;
-            while (right < system.length && ['F','G'].includes(system[right])) right++;
-            right--;
-            
-            return right - left + 1;
-        }
-
-        function interpretLSystem(system, angleX, angleY) {
-            const segs = [];
-            const segmentLength = 4;
-            
-            class TurtleState {
-                constructor(pos, forward, up, right) {
-                    this.pos = pos;
-                    this.forward = forward;
-                    this.up = up;
-                    this.right = right;
-                }
-                
-                clone() {
-                    return new TurtleState(
-                        this.pos.clone(),
-                        this.forward.clone(),
-                        this.up.clone(),
-                        this.right.clone()
-                    );
-                }
-            }
-
-            class Vector3 {
-                constructor(x, y, z) {
-                    this.x = x;
-                    this.y = y;
-                    this.z = z;
-                }
-                
-                clone() { return new Vector3(this.x, this.y, this.z); }
-                add(v) { return new Vector3(this.x+v.x, this.y+v.y, this.z+v.z); }
-                multiply(s) { return new Vector3(this.x*s, this.y*s, this.z*s); }
-                dot(v) { return this.x*v.x + this.y*v.y + this.z*v.z; }
-                cross(v) {
-                    return new Vector3(
-                        this.y*v.z - this.z*v.y,
-                        this.z*v.x - this.x*v.z,
-                        this.x*v.y - this.y*v.x
-                    );
-                }
-                normalize() {
-                    const mag = Math.sqrt(this.x**2 + this.y**2 + this.z**2);
-                    return mag === 0 ? this : new Vector3(this.x/mag, this.y/mag, this.z/mag);
-                }
-            }
-
-            let state = new TurtleState(
-                new Vector3(0, 0, 0),
-                new Vector3(0, -1, 0),
-                new Vector3(0, 0, 1),
-                new Vector3(0, -1, 0).cross(new Vector3(0, 0, 1)).normalize()
-            );
-            
-            const stack = [];
-
-            for (let i = 0; i < system.length; i++) {
-                const c = system[i];
-                switch(c) {
-                    case 'F':
-                    case 'G':
-                        const end = state.pos.add(state.forward.multiply(segmentLength));
-                        const length = countConsecutiveFG(system, i);
-                        segs.push({
-                            start: state.pos, 
-                            end,
-                            length,
-                            index: i
-                        });
-                        state.pos = end;
-                        break;
-                        
-                    case 'N':
-                        state.pos = state.pos.add(state.forward.multiply(segmentLength));
-                        break;
-                        
-                    case '+':
-                        state.forward = rotateAroundAxis(state.forward, state.up, angleX);
-                        state.right = rotateAroundAxis(state.right, state.up, angleX);
-                        break;
-                        
-                    case '-':
-                        state.forward = rotateAroundAxis(state.forward, state.up, -angleX);
-                        state.right = rotateAroundAxis(state.right, state.up, -angleX);
-                        break;
-                        
-                    case '>':
-                        state.forward = rotateAroundAxis(state.forward, state.right, angleY);
-                        state.up = rotateAroundAxis(state.up, state.right, angleY);
-                        break;
-                        
-                    case '<':
-                        state.forward = rotateAroundAxis(state.forward, state.right, -angleY);
-                        state.up = rotateAroundAxis(state.up, state.right, -angleY);
-                        break;
-                        
-                    case '[':
-                        stack.push(state.clone());
-                        break;
-                        
-                    case ']':
-                        if (stack.length > 0) state = stack.pop();
-                        break;
-                }
-            }
-            return segs;
-        }
-
-        function rotateAroundAxis(v, axis, theta) {
-            const a = axis.normalize();
-            const cos = Math.cos(theta);
-            const sin = Math.sin(theta);
-            
-            return v.multiply(cos)
-                .add(a.cross(v).multiply(sin))
-                .add(a.multiply(a.dot(v) * (1 - cos)));
-        }
-
-        function toggleColorMode() {
-            colorMode = !colorMode;
-            const btn = document.getElementById('colorModeBtn');
-            btn.textContent = `Color Mode: ${colorMode ? 'ON' : 'OFF'}`;
-            btn.classList.toggle('active', colorMode);
-            draw();
-        }
-
-        function toggleThicknessMode() {
-            thicknessMode = !thicknessMode;
-            const btn = document.getElementById('thicknessModeBtn');
-            btn.textContent = `Thickness Mode: ${thicknessMode ? 'ON' : 'OFF'}`;
-            btn.classList.toggle('active', thicknessMode);
-            draw();
-        }
-
-        function redraw() {
-            const rules = {};
-            symbols.forEach(symbol => {
-                rules[symbol] = document.getElementById(`rule-${symbol}`).value || symbol;
-            });
-            
-            const system = generateLSystem(
-                document.getElementById('axiom').value,
-                rules,
-                parseInt(document.getElementById('iterations').value)
-            );
-            
-            segments = interpretLSystem(
-                system,
-                parseFloat(document.getElementById('angleX').value) * Math.PI / 180,
-                parseFloat(document.getElementById('angleY').value) * Math.PI / 180
-            );
-            
-            draw();
-        }
-
-        function draw() {
-            const canvas = document.getElementById('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const d = 1000;
-            
-            segments.forEach(seg => {
-                const p1 = applyRotation(seg.start);
-                const p2 = applyRotation(seg.end);
-                
-                const pp1 = project(p1, centerX, centerY, d);
-                const pp2 = project(p2, centerX, centerY, d);
-                
-                // Инвертированная цветовая схема
-                if (colorMode) {
-                    const hue = 120 - (seg.length * 8); // Зеленый для тонких веток
-                    ctx.strokeStyle = `hsl(${Math.max(30, hue)}, 70%, 40%)`;
-                } else {
-                    ctx.strokeStyle = 'blue';
-                }
-                
-                if (thicknessMode) {
-                    ctx.lineWidth = Math.max(1, (seg.length * 0.5));
-                } else {
-                    ctx.lineWidth = 2;
-                }
-                
-                ctx.beginPath();
-                ctx.moveTo(pp1.x, pp1.y);
-                ctx.lineTo(pp2.x, pp2.y);
-                ctx.stroke();
-            });
-        }
-
-        function applyRotation(p) {
-            let x = p.x * Math.cos(globalRotY) + p.z * Math.sin(globalRotY);
-            let z = -p.x * Math.sin(globalRotY) + p.z * Math.cos(globalRotY);
-            let y = p.y;
-            
-            y = y * Math.cos(globalRotX) - z * Math.sin(globalRotX);
-            z = p.y * Math.sin(globalRotX) + z * Math.cos(globalRotX);
-            
-            return {x, y, z};
-        }
-
-        function project(p, cx, cy, d) {
-            const factor = d / (p.z + d);
-            return {
-                x: p.x * factor + cx,
-                y: p.y * factor + cy
+            // Элементы
+            const pages = {
+                main: document.getElementById('mainPage'),
+                past: document.getElementById('pastPage'),
+                present: document.getElementById('presentPage'),
+                connection: document.getElementById('connectionPage'),
+                about: document.getElementById('aboutPage')
             };
-        }
 
-        function toggleSettings() {
-            const controls = document.getElementById('controls');
-            controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
-        }
+            const subtitleEl = document.getElementById('subtitleDisplay');
+            const screenReaderBtn = document.getElementById('screenReaderBtn');
+            const contrastBtn = document.getElementById('contrastBtn');
+            const largeFontBtn = document.getElementById('largeFontBtn');
+            const subtitlesBtn = document.getElementById('subtitlesBtn');
+            const signBtn = document.getElementById('signBtn');
 
-        // Инициализация
-        initRules();
-        redraw();
+            // Все кнопки на странице (динамически обновляем при загрузке)
+            let allButtons = [];
 
-        // Обработчики событий
-        canvas.addEventListener('mousedown', e => {
-            isDragging = true;
-            lastX = e.clientX;
-            lastY = e.clientY;
-        });
+            // Функция сбора всех кнопок (обновляем после каждого изменения DOM, но здесь статика)
+            function refreshButtonsList() {
+                allButtons = Array.from(document.querySelectorAll('button'));
+            }
 
-        canvas.addEventListener('mousemove', e => {
-            if (!isDragging) return;
-            
-            const dx = e.clientX - lastX;
-            const dy = e.clientY - lastY;
-            
-            globalRotY += dx * 0.005;
-            globalRotX += dy * 0.005;
-            
-            lastX = e.clientX;
-            lastY = e.clientY;
-            
-            draw();
-        });
+            // Озвучивание текста с помощью Web Speech API
+            function speakText(text) {
+                console.log('Озвучивание:', text);
+                if (!screenReaderEnabled) return;
+                if (!window.speechSynthesis) {
+                    console.warn('Речь не поддерживается');
+                    return;
+                }
+                // Останавливаем текущую речь, чтобы не накладывалась
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ru-RU';
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
 
-        canvas.addEventListener('mouseup', () => isDragging = false);
-        canvas.addEventListener('mouseleave', () => isDragging = false);
+            // Обновление субтитров
+            function updateSubtitles(message) {
+                subtitleEl.textContent = 'Субтитры: ' + message;
+            }
 
-        canvas.addEventListener('touchstart', e => {
-            e.preventDefault();
-            isTouching = true;
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-        });
+            // Переключение страницы
+            function showPage(pageId) {
+                // Скрываем все страницы
+                Object.values(pages).forEach(page => page.classList.remove('active'));
+                // Показываем нужную
+                if (pages[pageId]) {
+                    pages[pageId].classList.add('active');
+                    // Если это не главная страница - озвучиваем текст страницы
+                    if (pageId !== 'main') {
+                        const textElement = pages[pageId].querySelector('.page-text');
+                        if (textElement) {
+                            const pageText = textElement.innerText;
+                            speakText(pageText);
+                            updateSubtitles('Страница: ' + pageId + '. ' + pageText.substring(0, 100) + '...');
+                        }
+                    } else {
+                        updateSubtitles('Главное меню');
+                    }
+                    // Устанавливаем фокус на первую кнопку в странице (для удобства навигации)
+                    const firstButton = pages[pageId].querySelector('button');
+                    if (firstButton) {
+                        firstButton.focus();
+                    }
+                }
+            }
 
-        canvas.addEventListener('touchmove', e => {
-            if (!isTouching) return;
-            e.preventDefault();
-            
-            const touch = e.touches[0];
-            const dx = touch.clientX - touchStartX;
-            const dy = touch.clientY - touchStartY;
-            
-            globalRotY += dx * 0.005;
-            globalRotX += dy * 0.005;
-            
-            touchStartX = touch.clientX;
-            touchStartY = touch.clientY;
-            
-            draw();
-        });
+            // Обработчик фокуса на кнопках
+            function handleFocus(event) {
+                const target = event.target;
+                if (target.tagName === 'BUTTON' && screenReaderEnabled) {
+                    speakText(target.textContent);
+                    updateSubtitles('Фокус: ' + target.textContent);
+                }
+            }
 
-        canvas.addEventListener('touchend', () => {
-            isTouching = false;
-        });
+            // --- Инициализация обработчиков ---
 
-        // Привязка слайдеров
-        document.getElementById('angleXRange').addEventListener('input', e => {
-            document.getElementById('angleX').value = e.target.value;
-            redraw();
-        });
-        
-        document.getElementById('angleYRange').addEventListener('input', e => {
-            document.getElementById('angleY').value = e.target.value;
-            redraw();
-        });
-        
-        document.getElementById('iterationsRange').addEventListener('input', e => {
-            document.getElementById('iterations').value = e.target.value;
-            redraw();
-        });
-        
-        document.getElementById('iterations').addEventListener('input', e => {
-            document.getElementById('iterationsRange').value = e.target.value;
-            redraw();
-        });
+            // Глобальный слушатель фокуса (событие focusin всплывает)
+            document.addEventListener('focusin', handleFocus);
+
+            // Навигация по кнопкам с атрибутом data-page
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-page]');
+                if (btn) {
+                    const page = btn.getAttribute('data-page');
+                    showPage(page);
+                }
+            });
+
+            // --- Кнопки доступности ---
+
+            // Контрастный режим
+            contrastBtn.addEventListener('click', () => {
+                contrastMode = !contrastMode;
+                document.body.classList.toggle('contrast', contrastMode);
+                const msg = 'Контрастный режим ' + (contrastMode ? 'включён' : 'выключен');
+                speakText(msg);
+                updateSubtitles(msg);
+            });
+
+            // Крупный текст
+            largeFontBtn.addEventListener('click', () => {
+                largeTextMode = !largeTextMode;
+                document.body.classList.toggle('large-text', largeTextMode);
+                const msg = 'Крупный текст ' + (largeTextMode ? 'включён' : 'выключен');
+                speakText(msg);
+                updateSubtitles(msg);
+            });
+
+            // Экранный диктор
+            screenReaderBtn.addEventListener('click', () => {
+                screenReaderEnabled = !screenReaderEnabled;
+                screenReaderBtn.textContent = 'Экранный диктор (' + (screenReaderEnabled ? 'вкл' : 'выкл') + ')';
+                const msg = 'Экранный диктор ' + (screenReaderEnabled ? 'включён' : 'выключен');
+                speakText(msg);
+                updateSubtitles(msg);
+            });
+
+            // Субтитры (демо)
+            subtitlesBtn.addEventListener('click', () => {
+                const msg = 'Субтитры: тестовое сообщение';
+                updateSubtitles('Тестовое сообщение');
+                speakText('Субтитры обновлены');
+            });
+
+            // Сурдоперевод (демо)
+            signBtn.addEventListener('click', () => {
+                const msg = 'Открыт сурдоперевод';
+                speakText(msg);
+                updateSubtitles(msg);
+            });
+
+            // Обновить список кнопок при загрузке
+            refreshButtonsList();
+
+            // Ставим фокус на первую кнопку главного меню после загрузки
+            window.addEventListener('load', () => {
+                const firstMainBtn = document.querySelector('#mainPage .nav-button');
+                if (firstMainBtn) {
+                    firstMainBtn.focus();
+                }
+                // Показываем главную страницу на всякий случай
+                showPage('main');
+            });
+
+            // Дополнительно: при переходе на страницу с помощью кнопки "На главную"
+            // фокус уже устанавливается в showPage.
+        })();
     </script>
 </body>
-  </html>
+</html>
