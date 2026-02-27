@@ -1,12 +1,13 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Единство. Доблесть. Технологии. Татарстан</title>
+    <!-- Favicon: флаг Татарстана (зелёно-бело-красный) в формате SVG -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 6'%3E%3Crect width='9' height='2' fill='%23009657'/%3E%3Crect y='2' width='9' height='2' fill='%23FFFFFF'/%3E%3Crect y='4' width='9' height='2' fill='%23D52B1E'/%3E%3C/svg%3E">
     <style>
-        /* Базовые стили */
+        /* Базовые стили (без изменений, кроме небольших дополнений) */
         * {
             box-sizing: border-box;
             font-family: Arial, sans-serif;
@@ -135,6 +136,20 @@
         .main-menu-button:hover {
             background-color: #da190b;
         }
+        /* Кнопка озвучивания страницы */
+        #speakPageBtn {
+            background-color: #9b59b6;
+        }
+        #speakPageBtn:hover {
+            background-color: #8e44ad;
+        }
+        /* Индикатор поддержки речи */
+        .speech-support {
+            font-size: 0.8em;
+            color: #666;
+            text-align: center;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -147,6 +162,7 @@
         <button id="screenReaderBtn">Экранный диктор (вкл)</button>
         <button id="subtitlesBtn">Субтитры</button>
         <button id="signBtn">Сурдоперевод</button>
+        <button id="speakPageBtn">🔊 Озвучить страницу</button>
     </div>
 
     <!-- Контейнер страниц (стек) -->
@@ -214,6 +230,8 @@
 
     <!-- Субтитры -->
     <div class="subtitle" id="subtitleDisplay">Субтитры: Добро пожаловать</div>
+    <!-- Информация о поддержке речи (для отладки) -->
+    <div class="speech-support" id="speechSupportInfo"></div>
 
     <script>
         (function() {
@@ -237,30 +255,52 @@
             const largeFontBtn = document.getElementById('largeFontBtn');
             const subtitlesBtn = document.getElementById('subtitlesBtn');
             const signBtn = document.getElementById('signBtn');
+            const speakPageBtn = document.getElementById('speakPageBtn');
+            const speechSupportInfo = document.getElementById('speechSupportInfo');
 
-            // Все кнопки на странице (динамически обновляем при загрузке)
-            let allButtons = [];
+            // Проверка поддержки Web Speech API
+            const speechSupported = 'speechSynthesis' in window;
+            speechSupportInfo.textContent = speechSupported 
+                ? '🔊 Речь поддерживается' 
+                : '⚠️ Речь не поддерживается вашим браузером. Используйте субтитры.';
 
-            // Функция сбора всех кнопок (обновляем после каждого изменения DOM, но здесь статика)
-            function refreshButtonsList() {
-                allButtons = Array.from(document.querySelectorAll('button'));
-            }
-
-            // Озвучивание текста с помощью Web Speech API
+            // Функция озвучивания с проверкой и безопасностью
             function speakText(text) {
                 console.log('Озвучивание:', text);
-                if (!screenReaderEnabled) return;
-                if (!window.speechSynthesis) {
+                // Всегда обновляем субтитры
+                updateSubtitles('Озвучивание: ' + text.substring(0, 100) + (text.length > 100 ? '…' : ''));
+                
+                if (!screenReaderEnabled) {
+                    console.log('Экранный диктор выключен');
+                    return;
+                }
+                if (!speechSupported) {
                     console.warn('Речь не поддерживается');
                     return;
                 }
-                // Останавливаем текущую речь, чтобы не накладывалась
+                // Отмена предыдущей речи, чтобы не накладывалось
                 window.speechSynthesis.cancel();
+                
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'ru-RU';
                 utterance.rate = 1.0;
                 utterance.pitch = 1.0;
-                window.speechSynthesis.speak(utterance);
+                utterance.volume = 1.0;
+                
+                // Обработка ошибок
+                utterance.onerror = (event) => {
+                    console.error('Ошибка синтеза речи:', event.error);
+                    updateSubtitles('Ошибка воспроизведения речи. Проверьте настройки браузера.');
+                };
+                
+                // В некоторых браузерах требуется пользовательский жест для первого запуска.
+                // Мы уже находимся в обработчике клика, поэтому проблем быть не должно.
+                try {
+                    window.speechSynthesis.speak(utterance);
+                } catch (e) {
+                    console.error('Исключение при speak():', e);
+                    updateSubtitles('Не удалось запустить речь.');
+                }
             }
 
             // Обновление субтитров
@@ -275,18 +315,27 @@
                 // Показываем нужную
                 if (pages[pageId]) {
                     pages[pageId].classList.add('active');
-                    // Если это не главная страница - озвучиваем текст страницы
-                    if (pageId !== 'main') {
-                        const textElement = pages[pageId].querySelector('.page-text');
-                        if (textElement) {
-                            const pageText = textElement.innerText;
+                    
+                    // Получаем текст страницы для озвучивания и субтитров
+                    let pageText = '';
+                    const textElement = pages[pageId].querySelector('.page-text');
+                    if (textElement) {
+                        pageText = textElement.innerText;
+                    }
+                    
+                    if (pageId === 'main') {
+                        updateSubtitles('Главное меню');
+                        // Не озвучиваем текст главной страницы автоматически (только кнопки)
+                    } else {
+                        // Озвучиваем текст страницы, если диктор включён
+                        if (screenReaderEnabled) {
                             speakText(pageText);
+                        } else {
                             updateSubtitles('Страница: ' + pageId + '. ' + pageText.substring(0, 100) + '...');
                         }
-                    } else {
-                        updateSubtitles('Главное меню');
                     }
-                    // Устанавливаем фокус на первую кнопку в странице (для удобства навигации)
+                    
+                    // Устанавливаем фокус на первую кнопку в странице
                     const firstButton = pages[pageId].querySelector('button');
                     if (firstButton) {
                         firstButton.focus();
@@ -299,13 +348,12 @@
                 const target = event.target;
                 if (target.tagName === 'BUTTON' && screenReaderEnabled) {
                     speakText(target.textContent);
-                    updateSubtitles('Фокус: ' + target.textContent);
                 }
             }
 
             // --- Инициализация обработчиков ---
 
-            // Глобальный слушатель фокуса (событие focusin всплывает)
+            // Глобальный слушатель фокуса
             document.addEventListener('focusin', handleFocus);
 
             // Навигация по кнопкам с атрибутом data-page
@@ -360,8 +408,23 @@
                 updateSubtitles(msg);
             });
 
-            // Обновить список кнопок при загрузке
-            refreshButtonsList();
+            // Кнопка "Озвучить текущую страницу"
+            speakPageBtn.addEventListener('click', () => {
+                // Находим активную страницу
+                const activePage = document.querySelector('.page.active');
+                if (activePage) {
+                    const textElement = activePage.querySelector('.page-text');
+                    if (textElement) {
+                        speakText(textElement.innerText);
+                    } else {
+                        // Если нет текста (главная), озвучиваем название и кнопки?
+                        const title = activePage.querySelector('.page-title');
+                        if (title) {
+                            speakText(title.innerText + '. Главное меню.');
+                        }
+                    }
+                }
+            });
 
             // Ставим фокус на первую кнопку главного меню после загрузки
             window.addEventListener('load', () => {
@@ -369,12 +432,19 @@
                 if (firstMainBtn) {
                     firstMainBtn.focus();
                 }
-                // Показываем главную страницу на всякий случай
                 showPage('main');
+                
+                // Дополнительно: проверяем, не блокирует ли браузер автоматическую речь.
+                // Если speechSynthesis.speak не сработает без жеста, пользователь всегда может нажать кнопку "Озвучить страницу".
+                if (speechSupported) {
+                    // Небольшой тест: если голоса ещё не загружены, они подгрузятся.
+                    if (window.speechSynthesis.getVoices().length === 0) {
+                        window.speechSynthesis.addEventListener('voiceschanged', () => {
+                            console.log('Голоса загружены');
+                        });
+                    }
+                }
             });
-
-            // Дополнительно: при переходе на страницу с помощью кнопки "На главную"
-            // фокус уже устанавливается в showPage.
         })();
     </script>
 </body>
